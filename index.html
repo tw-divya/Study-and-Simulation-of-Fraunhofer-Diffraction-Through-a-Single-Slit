@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Fraunhofer Single-Slit Diffraction</title>
+
+<style>
+  body {
+    background: white;
+    font-family: Arial, sans-serif;
+    max-width: 920px;
+    margin: 20px auto;
+    padding: 0 15px;
+    color: #222;
+  }
+  h1, h2 {
+    color: #0b2a6f;   /* dark blue */
+  }
+  canvas {
+    border: 1px solid #999;
+    display: block;
+  }
+  .controls {
+    margin-top: 15px;
+  }
+  .row {
+    margin: 10px 0;
+  }
+  .row label {
+    display: inline-block;
+    width: 230px;
+    font-weight: bold;
+  }
+  .row input {
+    width: 300px;
+    vertical-align: middle;
+  }
+  .row span {
+    display: inline-block;
+    width: 100px;
+    font-weight: bold;
+    color: #0b2a6f;
+  }
+  .box {
+    border: 1px solid #0b2a6f;
+    padding: 10px 15px;
+    margin-top: 15px;
+  }
+  .note {
+    font-size: 14px;
+    color: #555;
+    margin-top: 10px;
+  }
+</style>
+</head>
+
+<body>
+
+<h1>Fraunhofer Diffraction Through a Single Slit</h1>
+
+<p>
+  When light passes through a very narrow slit, it spreads out instead of
+  going straight. On a distant screen we see a wide bright central fringe
+  with dimmer fringes on both sides, separated by dark fringes.
+  Change the three sliders below to see how the pattern changes.
+</p>
+
+<!-- Drawing area -->
+<canvas id="canvas" width="900" height="320"></canvas>
+
+<!-- Controls -->
+<div class="controls">
+  <div class="row">
+    <label>Wavelength (λ):</label>
+    <input type="range" id="wl" min="400" max="700" step="10" value="550" oninput="update()">
+    <span id="wlValue"></span>
+  </div>
+  <div class="row">
+    <label>Slit width (a):</label>
+    <input type="range" id="a" min="20" max="200" step="5" value="100" oninput="update()">
+    <span id="aValue"></span>
+  </div>
+  <div class="row">
+    <label>Screen distance (L):</label>
+    <input type="range" id="L" min="0.5" max="3" step="0.1" value="1" oninput="update()">
+    <span id="LValue"></span>
+  </div>
+</div>
+
+<!-- Calculation -->
+<div class="box">
+  <h2>Calculation of dark fringes</h2>
+  <p>Condition for dark fringes: <b>a sin θ = mλ</b><br>
+     For small angles: <b>y<sub>m</sub> = m λ L / a</b></p>
+  <ul>
+    <li><b>y</b> = distance of the dark fringe from the centre of the screen</li>
+    <li><b>m</b> = order of the dark fringe (1, 2, 3, ...)</li>
+    <li><b>λ</b> = wavelength of light</li>
+    <li><b>L</b> = distance between the slit and the screen</li>
+    <li><b>a</b> = width of the slit</li>
+  </ul>
+  <p>All values are converted to SI units (metres) before calculating.</p>
+  <p id="result1"></p>
+  <p id="result2"></p>
+  <p id="result3"></p>
+</div>
+
+<p class="note">
+  Note: This is an educational visualization, not an exact experimental
+  intensity measurement. The bright/dark pattern is drawn using a simple
+  approximate intensity curve, and its brightness is boosted slightly so the
+  side fringes are easy to see. The slit gap and the light source in the
+  drawing are not to scale. The dark-fringe positions in the calculation
+  section come directly from the formula.
+</p>
+
+<script>
+  // Get the canvas and its drawing tool
+  var canvas = document.getElementById("canvas");
+  var ctx = canvas.getContext("2d");
+
+  var W = canvas.width;
+  var H = canvas.height;
+
+  // Positions of things in the drawing (in pixels)
+  var sourceX = 60;
+  var slitX = 330;
+  var screenX = 700;
+  var screenW = 120;
+
+  // The screen shows from -25 mm to +25 mm
+  var rangeMm = 25;
+  var pxPerMm = (H / 2) / rangeMm;
+
+  function update() {
+    // 1. Read slider values
+    var wlNm = Number(document.getElementById("wl").value);
+    var aUm = Number(document.getElementById("a").value);
+    var L = Number(document.getElementById("L").value);
+
+    // 2. Show the values next to the sliders
+    document.getElementById("wlValue").innerHTML = wlNm + " nm";
+    document.getElementById("aValue").innerHTML = aUm + " µm";
+    document.getElementById("LValue").innerHTML = L + " m";
+
+    // 3. Convert to SI units (metres)
+    var lambda = wlNm * 1e-9;
+    var a = aUm * 1e-6;
+
+    // 4. Dark fringe positions: y = m * lambda * L / a
+    var y1 = 1 * lambda * L / a;
+    var y2 = 2 * lambda * L / a;
+
+    // 5. Show results (convert metres to millimetres for display)
+    document.getElementById("result1").innerHTML =
+      "1st dark fringe: y<sub>1</sub> = (1 × " + wlNm + " nm × " + L + " m) / " + aUm +
+      " µm = <b>" + (y1 * 1000).toFixed(2) + " mm</b> from the centre";
+    document.getElementById("result2").innerHTML =
+      "2nd dark fringe: y<sub>2</sub> = (2 × " + wlNm + " nm × " + L + " m) / " + aUm +
+      " µm = <b>" + (y2 * 1000).toFixed(2) + " mm</b> from the centre";
+    document.getElementById("result3").innerHTML =
+      "Width of central bright fringe = 2 × y<sub>1</sub> = <b>" +
+      (2 * y1 * 1000).toFixed(2) + " mm</b>";
+
+    // 6. Draw everything
+    draw(lambda, a, L, y1, y2);
+  }
+
+  function draw(lambda, a, L, y1, y2) {
+    var mid = H / 2;
+
+    // Clear the canvas (white background)
+    ctx.fillStyle = "white";
+    ctx.fillRect(0, 0, W, H);
+
+    // --- Light source (yellow circle) ---
+    ctx.fillStyle = "orange";
+    ctx.beginPath();
+    ctx.arc(sourceX, mid, 12, 0, 2 * Math.PI);
+    ctx.fill();
+
+    // Rays from source to slit
+    ctx.strokeStyle = "orange";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(sourceX + 12, mid - 6);
+    ctx.lineTo(slitX, mid - 6);
+    ctx.moveTo(sourceX + 12, mid);
+    ctx.lineTo(slitX, mid);
+    ctx.moveTo(sourceX + 12, mid + 6);
+    ctx.lineTo(slitX, mid + 6);
+    ctx.stroke();
+
+    // --- Barrier with a narrow slit (gap not to scale) ---
+    ctx.fillStyle = "black";
+    ctx.fillRect(slitX - 4, 0, 8, mid - 7);
+    ctx.fillRect(slitX - 4, mid + 7, 8, mid - 7);
+
+    // --- Dashed lines from slit to the first dark fringes ---
+    ctx.strokeStyle = "#888";
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    if (y1 * 1000 <= rangeMm) {
+      ctx.moveTo(slitX, mid);
+      ctx.lineTo(screenX, mid - y1 * 1000 * pxPerMm);
+      ctx.moveTo(slitX, mid);
+      ctx.lineTo(screenX, mid + y1 * 1000 * pxPerMm);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // --- Screen: draw the diffraction pattern row by row ---
+    for (var py = 0; py < H; py++) {
+      var yMm = (py - mid) / pxPerMm;        // position on screen in mm
+      var y = yMm / 1000;                    // convert to metres
+      var beta = Math.PI * a * y / (lambda * L);
+      var I;
+      if (Math.abs(beta) < 1e-6) {
+        I = 1;                               // centre of the pattern
+      } else {
+        var s = Math.sin(beta) / beta;
+        I = s * s;                           // approximate intensity
+      }
+      var brightness = Math.sqrt(I);         // boost so side fringes are visible
+      var c = Math.round(255 * brightness);
+      ctx.fillStyle = "rgb(" + c + "," + c + "," + Math.round(c * 0.4) + ")";
+      ctx.fillRect(screenX, py, screenW, 1);
+    }
+    ctx.strokeStyle = "black";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(screenX, 0, screenW, H);
+
+    // --- Red marks for dark fringes (m = 1 and m = 2) ---
+    ctx.fillStyle = "red";
+    ctx.font = "13px Arial";
+    var marks = [[y1, "1st"], [y2, "2nd"]];
+    for (var i = 0; i < marks.length; i++) {
+      var yy = marks[i][0] * 1000;           // mm
+      if (yy <= rangeMm) {
+        var up = mid - yy * pxPerMm;
+        var down = mid + yy * pxPerMm;
+        ctx.fillRect(screenX + screenW, up - 1, 10, 3);
+        ctx.fillRect(screenX + screenW, down - 1, 10, 3);
+        ctx.fillText(marks[i][1], screenX + screenW + 14, up + 4);
+        ctx.fillText(marks[i][1], screenX + screenW + 14, down + 4);
+      }
+    }
+
+    // --- Labels ---
+    ctx.fillStyle = "#0b2a6f";
+    ctx.font = "bold 14px Arial";
+    ctx.fillText("Light source", sourceX - 35, mid + 35);
+    ctx.fillText("Single slit", slitX - 30, H - 8);
+    ctx.fillText("Screen", screenX + 35, H - 8);
+
+    // L arrow label
+    ctx.strokeStyle = "#0b2a6f";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(slitX + 10, 25);
+    ctx.lineTo(screenX - 5, 25);
+    ctx.stroke();
+    ctx.fillText("L (slit to screen)", (slitX + screenX) / 2 - 55, 18);
+  }
+
+  // Draw once when the page loads
+  update();
+</script>
+
+</body>
+</html>
